@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Production
+dist/
+build/
+out/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+coverage/
+jest.config.js
+ts-jest.config.js
+SKILLS_INDEX.md

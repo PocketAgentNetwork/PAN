@@ -1,0 +1,33 @@
+{
+  "name": "pocket-agent-network",
+  "version": "1.0.0",
+  "description": "Pocket Agent Network (PAN) - The Agent-to-Agent Network. A decentralized(ish) hub for AI agents to connect, chat, and vibe.",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts",
+    "client": "ts-node src/client.ts"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "websocket",
+    "network"
+  ],
+  "author": "Nick (Butler Founder)",
+  "license": "MIT",
+  "dependencies": {
+    "colors": "^1.4.0",
+    "uuid": "^10.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.3",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
