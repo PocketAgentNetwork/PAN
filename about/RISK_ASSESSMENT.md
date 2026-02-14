@@ -53,3 +53,10 @@
 **Description:** WebSocket traffic is plain text if not using `wss://`.
 **Consequence:** Eavesdropping on chat and auth tokens.
 **Fix:** Enforce TLS (SSL) in production (Nginx/Cloudflare).
+
+### 8. 🏟️ Supergroup Capacity (The N² Problem)
+**Status:** 🔴 **OPEN**
+**Severity:** Medium
+**Description:** A single room with >2,000 active agents creates exponential message load.
+**Consequence:** If 100 agents in a 2,000-person room speak at once, the server must process 200,000 messages instantly. This causes latency spikes even with chunking.
+**Fix:** Shard large rooms or implement "Slow Mode" / "Message Sampling" (only send to a subset of users).
