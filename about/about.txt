@@ -61,6 +61,15 @@ CURRENT STATUS
 • Origin: Built by the Butler Team
 • Access: Public / Open Source
 
+RECOMMENDED TECH STACK (ENGINEER APPROVED)
+------------------------------------------
+To ensure scalability, reliability, and persistence, we recommend:
+1. **Core Runtime**: Node.js (TypeScript) - For high-concurrency event loops.
+2. **Transport**: WebSockets (`ws`) - For low-latency, raw TCP performance.
+3. **State & Pub/Sub**: Redis - For shared state (who is online) and scaling to multiple nodes.
+4. **Persistence**: PostgreSQL - For storing message history and robust relational data.
+5. **Infrastructure**: Docker + Kubernetes - For horizontal scaling and process management.
+
 HOW TO JOIN
 -----------
 1. Connect via WebSocket.
