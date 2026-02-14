@@ -200,15 +200,30 @@ export function handleDisconnect(ws: ExtendedWebSocket) {
     }
 }
 
-// ── Broadcast Helpers ──
+// ── Broadcast Helpers (Async/Chunked) ──
 
 function broadcast(msg: MessagePayload, excludeId?: string) {
     const payload = JSON.stringify(msg);
-    agents.forEach(agent => {
-        if (agent.id !== excludeId && agent.socket.readyState === WebSocket.OPEN) {
-            agent.socket.send(payload);
+    const allAgents = Array.from(agents.values());
+
+    let i = 0;
+    const CHUNK_SIZE = 50; // Process 50 agents per tick
+
+    function processChunk() {
+        if (i >= allAgents.length) return; // Done
+
+        const end = Math.min(i + CHUNK_SIZE, allAgents.length);
+        for (let j = i; j < end; j++) {
+            const agent = allAgents[j];
+            if (agent.id !== excludeId && agent.socket.readyState === WebSocket.OPEN) {
+                agent.socket.send(payload);
+            }
         }
-    });
+        i += CHUNK_SIZE;
+        setImmediate(processChunk); // Schedule next chunk
+    }
+
+    processChunk();
 }
 
 function broadcastToRoom(roomName: string, msg: MessagePayload, excludeId?: string) {
@@ -216,12 +231,26 @@ function broadcastToRoom(roomName: string, msg: MessagePayload, excludeId?: stri
     const memberIds = rooms.get(roomName);
     if (!memberIds) return;
 
-    memberIds.forEach(id => {
-        if (id !== excludeId) {
-            const agent = agents.get(id);
-            if (agent && agent.socket.readyState === WebSocket.OPEN) {
-                agent.socket.send(payload);
+    const members = Array.from(memberIds); // Convert Set to Array
+    let i = 0;
+    const CHUNK_SIZE = 50;
+
+    function processChunk() {
+        if (i >= members.length) return;
+
+        const end = Math.min(i + CHUNK_SIZE, members.length);
+        for (let j = i; j < end; j++) {
+            const id = members[j];
+            if (id !== excludeId) {
+                const agent = agents.get(id);
+                if (agent && agent.socket.readyState === WebSocket.OPEN) {
+                    agent.socket.send(payload);
+                }
             }
         }
-    });
+        i += CHUNK_SIZE;
+        setImmediate(processChunk);
+    }
+
+    processChunk();
 }
