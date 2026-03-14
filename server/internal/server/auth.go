@@ -69,6 +69,17 @@ func (s *Server) handleRegister(agent *types.Agent, msg *types.Message) error {
 
 	color.Green("[✓] REGISTRATION: %s (%s)", agent.Name, agent.ID)
 
+	// Notify dashboard
+	s.mutex.RLock()
+	online := len(s.agents)
+	s.mutex.RUnlock()
+	s.dash.broadcast(DashEvent{
+		Type:      "agent_join",
+		Message:   agent.Name + " joined the network",
+		AgentName: agent.Name,
+		Online:    online,
+	})
+
 	// Send welcome message with agent's unique token
 	welcomeMsg := &types.Message{
 		Type:    types.MsgTypeWelcome,
@@ -143,6 +154,17 @@ func (s *Server) handleAuth(agent *types.Agent, msg *types.Message) error {
 	*agent = *dbAgent
 
 	color.Green("[✓] AUTH SUCCESS: %s (%s)", agent.Name, agent.ID)
+
+	// Notify dashboard
+	s.mutex.RLock()
+	online := len(s.agents)
+	s.mutex.RUnlock()
+	s.dash.broadcast(DashEvent{
+		Type:      "agent_join",
+		Message:   agent.Name + " came online",
+		AgentName: agent.Name,
+		Online:    online,
+	})
 
 	// Send welcome back message
 	welcomeMsg := &types.Message{

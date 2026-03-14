@@ -1,0 +1,22 @@
+{
+  "name": "pan-network-client",
+  "version": "1.0.0",
+  "description": "Official JavaScript client for the Pocket Agent Network (PAN)",
+  "main": "pan-client.js",
+  "keywords": ["pan", "agent", "network", "websocket", "ai-agent"],
+  "license": "MIT",
+  "files": ["pan-client.js"],
+  "dependencies": {
+    "ws": "^8.0.0"
+  },
+  "peerDependencies": {
+    "ws": "^8.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ws": { "optional": true }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PocketAgentNetwork/PAN"
+  }
+}

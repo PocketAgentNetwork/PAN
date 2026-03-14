@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,6 +24,8 @@ type Server struct {
 	db        *database.DB
 	agents    map[string]*types.Agent
 	rooms     map[string]*types.Room
+	ipCounts  map[string]int
+	dash      *dashboardHub
 	upgrader  websocket.Upgrader
 	mutex     sync.RWMutex
 }
@@ -33,25 +37,61 @@ func New(cfg *config.Config, db *database.DB) *Server {
 		db:       db,
 		agents:   make(map[string]*types.Agent),
 		rooms:    make(map[string]*types.Room),
+		ipCounts: make(map[string]int),
+		dash:     newDashboardHub(),
 		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool {
-				return true // Allow all origins for now
-			},
+			CheckOrigin: func(r *http.Request) bool { return true },
 		},
 	}
 }
 
+// HandleDashboardWS exposes the dashboard hub as an HTTP handler
+func (s *Server) HandleDashboardWS(w http.ResponseWriter, r *http.Request) {
+	s.dash.ServeHTTP(w, r)
+}
+
+// getClientIP extracts the real client IP from the request
+func getClientIP(r *http.Request) string {
+	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
+		return strings.Split(ip, ",")[0]
+	}
+	if ip := r.Header.Get("X-Real-IP"); ip != "" {
+		return ip
+	}
+	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+	return host
+}
+
 // HandleWebSocket handles WebSocket connections
 func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-	// Check connection limits
-	if len(s.agents) >= s.config.MaxTotalAgents {
+	// Check total capacity
+	s.mutex.RLock()
+	totalAgents := len(s.agents)
+	s.mutex.RUnlock()
+
+	if totalAgents >= s.config.MaxTotalAgents {
 		http.Error(w, "Server at capacity", http.StatusServiceUnavailable)
 		return
 	}
 
+	// Check per-IP connection limit
+	clientIP := getClientIP(r)
+	s.mutex.Lock()
+	if s.ipCounts[clientIP] >= s.config.MaxAgentsPerIP {
+		s.mutex.Unlock()
+		http.Error(w, "Too many connections from your IP", http.StatusTooManyRequests)
+		color.Yellow("[!] IP limit hit: %s", clientIP)
+		return
+	}
+	s.ipCounts[clientIP]++
+	s.mutex.Unlock()
+
 	// Upgrade to WebSocket
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
+		s.mutex.Lock()
+		s.ipCounts[clientIP]--
+		s.mutex.Unlock()
 		log.Printf("WebSocket upgrade failed: %v", err)
 		return
 	}
@@ -59,6 +99,7 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	// Create temporary agent for connection
 	tempAgent := &types.Agent{
 		ID:          uuid.New().String(),
+		IP:          clientIP,
 		Conn:        conn,
 		IsAuthed:    false,
 		ConnectedAt: time.Now(),
@@ -68,12 +109,11 @@ func (s *Server) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		Friends:     make(map[string]bool),
 	}
 
-	color.Yellow("[+] New connection: %s (waiting for auth...)", tempAgent.ID)
+	color.Yellow("[+] New connection: %s from %s (waiting for auth...)", tempAgent.ID, clientIP)
 
 	// Handle the connection
 	s.handleConnection(tempAgent)
 }
-
 // handleConnection manages a WebSocket connection
 func (s *Server) handleConnection(agent *types.Agent) {
 	defer func() {
@@ -174,12 +214,25 @@ func (s *Server) checkRateLimit(agent *types.Agent) bool {
 
 // handleDisconnect cleans up when agent disconnects
 func (s *Server) handleDisconnect(agent *types.Agent) {
+	// Decrement IP count
+	if agent.IP != "" {
+		s.mutex.Lock()
+		if s.ipCounts[agent.IP] > 0 {
+			s.ipCounts[agent.IP]--
+		}
+		if s.ipCounts[agent.IP] == 0 {
+			delete(s.ipCounts, agent.IP)
+		}
+		s.mutex.Unlock()
+	}
+
 	if !agent.IsAuthed {
 		return
 	}
 
 	s.mutex.Lock()
 	delete(s.agents, agent.ID)
+	online := len(s.agents)
 	s.mutex.Unlock()
 
 	// Update last seen in database
@@ -189,6 +242,14 @@ func (s *Server) handleDisconnect(agent *types.Agent) {
 
 	// Notify other agents
 	s.broadcastSystem(fmt.Sprintf("%s left the network", agent.Name), agent.ID)
+
+	// Notify dashboard
+	s.dash.broadcast(DashEvent{
+		Type:      "agent_leave",
+		Message:   agent.Name + " left the network",
+		AgentName: agent.Name,
+		Online:    online,
+	})
 }
 
 // sendMessage sends a message to an agent

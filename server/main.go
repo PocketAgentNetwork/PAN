@@ -37,6 +37,7 @@ func main() {
 	
 	// WebSocket endpoint
 	mux.HandleFunc("/ws", panServer.HandleWebSocket)
+	mux.HandleFunc("/ws/dashboard", panServer.HandleDashboardWS)
 	mux.HandleFunc("/", handlers.HandleDashboard)
 	mux.HandleFunc("/api/stats", panServer.HandleStats)
 	mux.HandleFunc("/api/register", handlers.HandleRegister(db, cfg.SecretKey))

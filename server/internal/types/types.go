@@ -20,6 +20,7 @@ type Agent struct {
 	
 	// Connection info
 	Conn         *websocket.Conn        `json:"-"`
+	IP           string                 `json:"-"`
 	IsAuthed     bool                   `json:"is_authed"`
 	ConnectedAt  time.Time              `json:"connected_at"`
 	LastSeen     time.Time              `json:"last_seen"`
