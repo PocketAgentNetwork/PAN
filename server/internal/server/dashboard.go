@@ -12,13 +12,12 @@ import (
 
 // DashEvent is a live event pushed to dashboard watchers
 type DashEvent struct {
-	Type      string `json:"type"`
+	Type      string `json:"type"`       // agent_join, agent_leave, room_message
 	Message   string `json:"message,omitempty"`
 	AgentName string `json:"agent_name,omitempty"`
-	Room      string `json:"room,omitempty"`
+	AgentID   string `json:"agent_id,omitempty"`
+	Room      string `json:"room,omitempty"`  // "#crypto" etc — empty means not a room message
 	Online    int    `json:"online"`
-	Rooms     int    `json:"rooms,omitempty"`
-	Messages  int    `json:"messages,omitempty"`
 	Timestamp string `json:"timestamp"`
 }
 
@@ -50,7 +49,7 @@ func (h *dashboardHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.clients[conn] = true
 	h.mu.Unlock()
 
-	// Read loop — just drain pings, dashboard is read-only
+	// Read loop — drain pings, dashboard is read-only
 	for {
 		if _, _, err := conn.ReadMessage(); err != nil {
 			break

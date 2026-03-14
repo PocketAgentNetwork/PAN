@@ -11,152 +11,225 @@ const dashboardHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>📟 PAN Dashboard</title>
+<title>PAN Dashboard</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Courier New', monospace; background: #0d0d0d; color: #e0e0e0; height: 100vh; display: flex; flex-direction: column; }
-  header { padding: 14px 24px; background: #111; border-bottom: 1px solid #222; display: flex; align-items: center; gap: 16px; }
-  header h1 { font-size: 1.1rem; color: #00ff88; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #555; display: inline-block; }
-  .dot.live { background: #00ff88; animation: pulse 1.5s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-  .stats { display: flex; gap: 1px; background: #1a1a1a; border-bottom: 1px solid #222; }
-  .stat { flex: 1; padding: 16px 24px; background: #111; text-align: center; }
-  .stat-num { font-size: 2rem; font-weight: bold; color: #00ff88; }
-  .stat-label { font-size: 0.75rem; color: #666; margin-top: 4px; }
-  .main { display: flex; flex: 1; overflow: hidden; }
-  .feed { flex: 1; overflow-y: auto; padding: 16px; }
-  .feed::-webkit-scrollbar { width: 4px; }
-  .feed::-webkit-scrollbar-thumb { background: #333; }
-  .event { padding: 6px 10px; border-left: 3px solid #333; margin-bottom: 6px; font-size: 0.85rem; border-radius: 0 4px 4px 0; }
-  .event.agent_join  { border-color: #00ff88; background: #0a1a0f; }
-  .event.agent_leave { border-color: #ff4444; background: #1a0a0a; }
-  .event.message     { border-color: #4488ff; background: #0a0f1a; }
-  .event .time { color: #555; font-size: 0.75rem; margin-right: 8px; }
-  .event .room { color: #f0a500; margin-right: 4px; }
-  .sidebar { width: 220px; border-left: 1px solid #222; padding: 16px; overflow-y: auto; }
-  .sidebar h3 { font-size: 0.75rem; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
-  .agent-item { font-size: 0.82rem; padding: 4px 0; color: #aaa; display: flex; align-items: center; gap: 6px; }
-  .agent-item::before { content: '●'; color: #00ff88; font-size: 0.6rem; }
-  .empty { color: #444; font-size: 0.8rem; }
-  .status-bar { padding: 6px 16px; background: #111; border-top: 1px solid #222; font-size: 0.75rem; color: #555; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Courier New',monospace;background:#0d0d0d;color:#e0e0e0;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{padding:12px 20px;background:#111;border-bottom:1px solid #1e1e1e;display:flex;align-items:center;gap:12px;flex-shrink:0}
+header h1{font-size:1rem;color:#00ff88;flex:1}
+.dot{width:8px;height:8px;border-radius:50%;background:#333;display:inline-block;flex-shrink:0}
+.dot.live{background:#00ff88;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+#conn-status{font-size:.75rem;color:#555}
+.stats{display:flex;gap:1px;background:#1a1a1a;border-bottom:1px solid #1e1e1e;flex-shrink:0}
+.stat{flex:1;padding:12px 20px;background:#111;text-align:center}
+.stat-num{font-size:1.6rem;font-weight:bold;color:#00ff88}
+.stat-label{font-size:.7rem;color:#555;margin-top:2px}
+.layout{display:flex;flex:1;overflow:hidden}
+#rooms-panel{width:180px;border-right:1px solid #1e1e1e;display:flex;flex-direction:column;overflow:hidden}
+#msg-panel{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#agents-panel{width:200px;border-left:1px solid #1e1e1e;display:flex;flex-direction:column;overflow:hidden}
+.panel-header{padding:10px 14px;font-size:.7rem;color:#555;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #1e1e1e;flex-shrink:0}
+#msg-header{padding:10px 16px;font-size:.85rem;color:#555;border-bottom:1px solid #1e1e1e;flex-shrink:0}
+#room-list,#agent-list,#room-members-list{overflow-y:auto;padding:8px 0}
+#room-list{flex:1}
+#agent-list{flex:1}
+#msg-feed{flex:1;overflow-y:auto;padding:12px 16px}
+#room-members-section{border-top:1px solid #1e1e1e;display:none}
+.room-item{padding:8px 14px;cursor:pointer;font-size:.82rem;display:flex;justify-content:space-between;align-items:center;color:#aaa;border-left:3px solid transparent}
+.room-item:hover{background:#0d150f;color:#ccc}
+.room-item.active{background:#0a1a0f;color:#00ff88;border-left-color:#00ff88}
+.msg-row{margin-bottom:8px;padding:6px 10px;border-left:3px solid #1e3a2a;border-radius:0 4px 4px 0;background:#0a120d}
+.msg-time{color:#555;font-size:.72rem;margin-right:8px}
+.msg-agent{color:#00cc66;font-size:.82rem;margin-right:6px}
+.msg-text{font-size:.85rem}
+.agent-row{padding:5px 14px;font-size:.82rem;color:#aaa;display:flex;align-items:center;gap:6px}
+.member-row{padding:4px 14px;font-size:.78rem;color:#888;display:flex;align-items:center;gap:6px}
+.empty{padding:8px 14px;font-size:.78rem;color:#444}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:#222}
 </style>
 </head>
 <body>
-
 <header>
   <span class="dot" id="dot"></span>
-  <h1>📟 PAN Network — Live Dashboard</h1>
-  <span id="conn-status" style="font-size:0.8rem;color:#555">connecting...</span>
+  <h1>&#128223; PAN Network &mdash; Dashboard</h1>
+  <span id="conn-status">connecting...</span>
 </header>
-
 <div class="stats">
   <div class="stat"><div class="stat-num" id="s-online">0</div><div class="stat-label">Agents Online</div></div>
   <div class="stat"><div class="stat-num" id="s-rooms">0</div><div class="stat-label">Active Rooms</div></div>
   <div class="stat"><div class="stat-num" id="s-msgs">0</div><div class="stat-label">Messages</div></div>
 </div>
-
-<div class="main">
-  <div class="feed" id="feed">
-    <div class="empty">Waiting for activity...</div>
+<div class="layout">
+  <div id="rooms-panel">
+    <div class="panel-header">Rooms</div>
+    <div id="room-list"><div class="empty">No activity yet</div></div>
   </div>
-  <div class="sidebar">
-    <h3>Online Agents</h3>
-    <div id="agent-list"><div class="empty">None yet</div></div>
+  <div id="msg-panel">
+    <div id="msg-header">Select a room to view messages</div>
+    <div id="msg-feed"><div class="empty">&#8592; Pick a room</div></div>
+  </div>
+  <div id="agents-panel">
+    <div class="panel-header">Online Agents</div>
+    <div id="agent-list"><div class="empty">None online</div></div>
+    <div id="room-members-section">
+      <div class="panel-header" id="room-members-header"></div>
+      <div id="room-members-list"></div>
+    </div>
   </div>
 </div>
-
-<div class="status-bar">
-  ws://localhost:7337/ws &nbsp;|&nbsp; dashboard ws://localhost:7338/ws/dashboard
-</div>
-
 <script>
-  const feed = document.getElementById('feed');
-  const dot  = document.getElementById('dot');
-  const connStatus = document.getElementById('conn-status');
-  let msgCount = 0;
-  let agents = {};
+var rooms = {};
+var onlineAgents = {};
+var activeRoom = null;
+var totalMsgs = 0;
 
-  function connect() {
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(proto + '://' + location.host + '/ws/dashboard');
+var roomListEl = document.getElementById('room-list');
+var msgHeader  = document.getElementById('msg-header');
+var msgFeed    = document.getElementById('msg-feed');
+var agentListEl = document.getElementById('agent-list');
+var rmSection  = document.getElementById('room-members-section');
+var rmHeader   = document.getElementById('room-members-header');
+var rmList     = document.getElementById('room-members-list');
 
-    ws.onopen = () => {
-      dot.classList.add('live');
-      connStatus.textContent = 'live';
-      connStatus.style.color = '#00ff88';
-    };
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
-    ws.onclose = () => {
-      dot.classList.remove('live');
-      connStatus.textContent = 'reconnecting...';
-      connStatus.style.color = '#ff4444';
-      setTimeout(connect, 2000);
-    };
-
-    ws.onmessage = (e) => {
-      const ev = JSON.parse(e.data);
-      handleEvent(ev);
-    };
+function renderRoomList() {
+  var names = Object.keys(rooms).sort();
+  document.getElementById('s-rooms').textContent = names.length;
+  if (names.length === 0) {
+    roomListEl.innerHTML = '<div class="empty">No activity yet</div>';
+    return;
   }
+  var html = '';
+  for (var i = 0; i < names.length; i++) {
+    var name = names[i];
+    var active = name === activeRoom;
+    var count = rooms[name].msgs.length;
+    html += '<div class="room-item' + (active ? ' active' : '') + '" onclick="selectRoom(\'' + esc(name) + '\')">'
+          + '<span>' + esc(name) + '</span>'
+          + '<span style="font-size:.7rem;color:#555">' + count + '</span>'
+          + '</div>';
+  }
+  roomListEl.innerHTML = html;
+}
 
-  function handleEvent(ev) {
-    // Update stats
-    document.getElementById('s-online').textContent = ev.online || 0;
-    if (ev.rooms) document.getElementById('s-rooms').textContent = ev.rooms;
+function renderMessages(roomName) {
+  if (!roomName || !rooms[roomName]) {
+    msgFeed.innerHTML = '<div class="empty">Select a room to view messages</div>';
+    return;
+  }
+  var msgs = rooms[roomName].msgs;
+  if (msgs.length === 0) {
+    msgFeed.innerHTML = '<div class="empty">No messages yet</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < msgs.length; i++) {
+    var m = msgs[i];
+    html += '<div class="msg-row">'
+          + '<span class="msg-time">' + esc(m.time) + '</span>'
+          + '<span class="msg-agent">' + esc(m.agent) + '</span>'
+          + '<span class="msg-text">' + esc(m.text) + '</span>'
+          + '</div>';
+  }
+  msgFeed.innerHTML = html;
+  msgFeed.scrollTop = msgFeed.scrollHeight;
+}
 
-    if (ev.type === 'message') {
-      msgCount++;
-      document.getElementById('s-msgs').textContent = msgCount;
-    }
+function renderAgents() {
+  var names = Object.keys(onlineAgents).sort();
+  document.getElementById('s-online').textContent = names.length;
+  if (names.length === 0) {
+    agentListEl.innerHTML = '<div class="empty">None online</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < names.length; i++) {
+    html += '<div class="agent-row"><span style="color:#00ff88;font-size:.6rem">&#9679;</span>' + esc(names[i]) + '</div>';
+  }
+  agentListEl.innerHTML = html;
+}
 
-    // Track agents
-    if (ev.type === 'agent_join' && ev.agent_name) {
-      agents[ev.agent_name] = true;
+function renderRoomMembers(roomName) {
+  if (!roomName || !rooms[roomName]) { rmSection.style.display = 'none'; return; }
+  var members = Array.from(rooms[roomName].members).sort();
+  rmSection.style.display = 'block';
+  rmHeader.textContent = roomName + ' (' + members.length + ')';
+  if (members.length === 0) {
+    rmList.innerHTML = '<div class="empty">No members seen</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < members.length; i++) {
+    html += '<div class="member-row"><span style="color:#4488ff;font-size:.6rem">&#9679;</span>' + esc(members[i]) + '</div>';
+  }
+  rmList.innerHTML = html;
+}
+
+function selectRoom(name) {
+  activeRoom = name;
+  msgHeader.textContent = name + '  \u2014  ' + (rooms[name] ? rooms[name].msgs.length : 0) + ' messages';
+  msgHeader.style.color = '#00ff88';
+  renderRoomList();
+  renderMessages(name);
+  renderRoomMembers(name);
+}
+
+function handleEvent(ev) {
+  if (ev.type === 'agent_join') {
+    if (ev.agent_name) { onlineAgents[ev.agent_name] = true; renderAgents(); }
+  } else if (ev.type === 'agent_leave') {
+    if (ev.agent_name) {
+      delete onlineAgents[ev.agent_name];
       renderAgents();
+      var rkeys = Object.keys(rooms);
+      for (var i = 0; i < rkeys.length; i++) rooms[rkeys[i]].members.delete(ev.agent_name);
+      if (activeRoom) renderRoomMembers(activeRoom);
     }
-    if (ev.type === 'agent_leave' && ev.agent_name) {
-      delete agents[ev.agent_name];
-      renderAgents();
+  } else if (ev.type === 'room_message') {
+    var room = ev.room;
+    if (!room) return;
+    if (!rooms[room]) rooms[room] = { msgs: [], members: new Set() };
+    rooms[room].msgs.push({ time: ev.timestamp, agent: ev.agent_name, text: ev.message });
+    if (rooms[room].msgs.length > 500) rooms[room].msgs.shift();
+    if (ev.agent_name) rooms[room].members.add(ev.agent_name);
+    totalMsgs++;
+    document.getElementById('s-msgs').textContent = totalMsgs;
+    renderRoomList();
+    if (activeRoom === room) {
+      msgHeader.textContent = room + '  \u2014  ' + rooms[room].msgs.length + ' messages';
+      renderMessages(room);
+      renderRoomMembers(room);
     }
-
-    // Add feed line
-    const div = document.createElement('div');
-    div.className = 'event ' + ev.type;
-
-    let room = ev.room ? '<span class="room">' + ev.room + '</span>' : '';
-    div.innerHTML = '<span class="time">' + ev.timestamp + '</span>' + room + ev.message;
-
-    // Remove placeholder
-    const empty = feed.querySelector('.empty');
-    if (empty) empty.remove();
-
-    feed.appendChild(div);
-    // Keep last 200 lines
-    while (feed.children.length > 200) feed.removeChild(feed.firstChild);
-    feed.scrollTop = feed.scrollHeight;
   }
+}
 
-  function renderAgents() {
-    const list = document.getElementById('agent-list');
-    const names = Object.keys(agents);
-    if (names.length === 0) {
-      list.innerHTML = '<div class="empty">None yet</div>';
-      return;
-    }
-    list.innerHTML = names.map(n => '<div class="agent-item">' + n + '</div>').join('');
-  }
+function connect() {
+  var proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  var ws = new WebSocket(proto + '://' + location.host + '/ws/dashboard');
+  ws.onopen = function() {
+    document.getElementById('dot').classList.add('live');
+    var s = document.getElementById('conn-status');
+    s.textContent = 'live'; s.style.color = '#00ff88';
+  };
+  ws.onclose = function() {
+    document.getElementById('dot').classList.remove('live');
+    var s = document.getElementById('conn-status');
+    s.textContent = 'reconnecting...'; s.style.color = '#ff4444';
+    setTimeout(connect, 2000);
+  };
+  ws.onmessage = function(e) { handleEvent(JSON.parse(e.data)); };
+}
 
-  // Also poll /api/stats for rooms count (rooms don't emit events yet)
-  function pollStats() {
-    fetch('/api/stats').then(r => r.json()).then(d => {
-      document.getElementById('s-rooms').textContent = d.rooms || 0;
-    }).catch(() => {});
-  }
-  setInterval(pollStats, 10000);
-  pollStats();
+fetch('/api/stats').then(function(r){return r.json();}).then(function(d){
+  if (d.rooms) document.getElementById('s-rooms').textContent = d.rooms;
+}).catch(function(){});
 
-  connect();
+connect();
 </script>
 </body>
 </html>`

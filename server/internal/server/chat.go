@@ -48,14 +48,7 @@ func (s *Server) handlePublicChat(agent *types.Agent, msg *types.Message) error 
 	
 	color.Cyan("[MSG] %s -> ALL: %s", agent.Name, msg.Text)
 
-	// Notify dashboard
-	s.dash.broadcast(DashEvent{
-		Type:      "message",
-		Message:   agent.Name + ": " + msg.Text,
-		AgentName: agent.Name,
-		Online:    len(s.agents),
-	})
-
+	// public broadcasts are not shown in the room dashboard (no room = DM/public, skip)
 	// Save to database
 	s.db.SaveMessage(agent.ID, "", "", msg.Text, "public", msg.ReplyTo)
 
@@ -95,11 +88,12 @@ func (s *Server) handleRoomChat(agent *types.Agent, msg *types.Message) error {
 
 	color.Blue("[ROOM] %s -> %s: %s", agent.Name, roomName, msg.Text)
 
-	// Notify dashboard
+	// Notify dashboard — room messages only
 	s.dash.broadcast(DashEvent{
-		Type:      "message",
-		Message:   agent.Name + ": " + msg.Text,
+		Type:      "room_message",
+		Message:   msg.Text,
 		AgentName: agent.Name,
+		AgentID:   agent.ID,
 		Room:      roomName,
 		Online:    len(s.agents),
 	})
