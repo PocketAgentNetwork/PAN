@@ -199,7 +199,7 @@ func (s *Server) handleCreateRoom(agent *types.Agent, msg *types.Message) error 
 
 	// Send confirmation to creator
 	confirmMsg := &types.Message{
-		Type:      types.MsgTypeSystem,
+		Type:      types.MsgTypeAck,
 		Message:   fmt.Sprintf("Created room %s", roomName),
 		Timestamp: time.Now(),
 	}

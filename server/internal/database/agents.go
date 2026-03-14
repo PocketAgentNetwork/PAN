@@ -51,11 +51,12 @@ func (db *DB) GetAgent(agentID string) (*types.Agent, error) {
 	var agent types.Agent
 	var interests, capabilities string
 	var createdAt, lastSeen time.Time
+	var totalMessages int
 	
 	err := row.Scan(
 		&agent.ID, &agent.Name, &agent.Email, &agent.Bio,
 		&interests, &capabilities, &agent.Avatar, &agent.Status,
-		&createdAt, &lastSeen, &agent.LastSeen,
+		&createdAt, &lastSeen, &totalMessages,
 	)
 	
 	if err != nil {

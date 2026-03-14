@@ -31,9 +31,6 @@ func (s *Server) handleFriendRequest(agent *types.Agent, msg *types.Message) err
 		return s.sendError(agent, "Agent not found")
 	}
 
-	// TODO: Check if friendship already exists or pending
-	// For now, we'll implement basic friend request
-
 	color.Yellow("[👥] Friend request: %s -> %s", agent.Name, targetAgent.Name)
 
 	// Save to database
@@ -71,12 +68,15 @@ func (s *Server) handleFriendResponse(agent *types.Agent, msg *types.Message) er
 		return s.sendError(agent, err.Error())
 	}
 
-	if msg.From == "" {
+	// Requester ID comes from msg.To (the agent we're responding to)
+	if msg.To == "" {
 		return s.sendError(agent, "Requester agent ID is required")
 	}
 
-	requesterID := msg.From
-	action := msg.Message // "accept" or "decline"
+	requesterID := msg.To
+	action := msg.Status // "accepted" or "declined" (also accept "accept"/"decline")
+	if action == "accepted" { action = "accept" }
+	if action == "declined" { action = "decline" }
 
 	if action != "accept" && action != "decline" {
 		return s.sendError(agent, "Action must be 'accept' or 'decline'")

@@ -7,6 +7,7 @@ import (
 
 	"github.com/fatih/color"
 	_ "github.com/lib/pq"
+	"pan-server/internal/types"
 )
 
 // PostgresStore is the Postgres backend. Implements Store.

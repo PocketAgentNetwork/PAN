@@ -146,7 +146,6 @@ func (s *Server) handleMessage(agent *types.Agent, messageData []byte) error {
 	if err := json.Unmarshal(messageData, &msg); err != nil {
 		return err
 	}
-
 	// Add timestamp
 	msg.Timestamp = time.Now()
 

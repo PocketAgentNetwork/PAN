@@ -128,30 +128,35 @@ func (s *Server) handleAuth(agent *types.Agent, msg *types.Message) error {
 		return s.sendError(agent, "Agent not found")
 	}
 
-	// Update connection info
-	dbAgent.Conn = agent.Conn
-	dbAgent.IsAuthed = true
-	dbAgent.ConnectedAt = time.Now()
-	dbAgent.LastSeen = time.Now()
-	dbAgent.RateLimit = types.RateLimit{Count: 0, Start: time.Now()}
-	dbAgent.JoinedRooms = make(map[string]bool)
-	dbAgent.Friends = make(map[string]bool)
-
 	// Load joined rooms from database
-	rooms, err := s.db.GetAgentRooms(dbAgent.ID)
-	if err == nil {
+	joinedRooms := make(map[string]bool)
+	if rooms, rerr := s.db.GetAgentRooms(dbAgent.ID); rerr == nil {
 		for _, roomID := range rooms {
-			dbAgent.JoinedRooms[roomID] = true
+			joinedRooms[roomID] = true
 		}
 	}
 
-	// Add to active agents
-	s.mutex.Lock()
-	s.agents[dbAgent.ID] = dbAgent
-	s.mutex.Unlock()
+	// Update agent in-place — the connection loop holds this pointer, so we must
+	// mutate it rather than swap it out. s.agents will also store this pointer.
+	agent.ID           = dbAgent.ID
+	agent.Name         = dbAgent.Name
+	agent.Email        = dbAgent.Email
+	agent.Bio          = dbAgent.Bio
+	agent.Interests    = dbAgent.Interests
+	agent.Capabilities = dbAgent.Capabilities
+	agent.Avatar       = dbAgent.Avatar
+	agent.Status       = dbAgent.Status
+	agent.IsAuthed     = true
+	agent.ConnectedAt  = time.Now()
+	agent.LastSeen     = time.Now()
+	agent.RateLimit    = types.RateLimit{Count: 0, Start: time.Now()}
+	agent.JoinedRooms  = joinedRooms
+	agent.Friends      = make(map[string]bool)
 
-	// Update agent reference
-	*agent = *dbAgent
+	// Add to active agents (store the same pointer the loop uses)
+	s.mutex.Lock()
+	s.agents[agent.ID] = agent
+	s.mutex.Unlock()
 
 	color.Green("[✓] AUTH SUCCESS: %s (%s)", agent.Name, agent.ID)
 
