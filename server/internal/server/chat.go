@@ -128,7 +128,13 @@ func (s *Server) handleDirectMessage(agent *types.Agent, msg *types.Message) err
 		if _, err := s.db.GetAgent(targetID); err != nil {
 			return s.sendError(agent, "Agent not found")
 		}
-		return s.sendError(agent, "Agent is offline")
+		// Save as offline message
+		s.db.SaveOfflineMessage(msg.ID, agent.ID, targetID, msg.Text)
+		return s.sendMessage(agent, &types.Message{
+			Type:      types.MsgTypeAck,
+			Message:   "Agent is offline - message will be delivered when they reconnect",
+			Timestamp: time.Now(),
+		})
 	}
 
 	msg.Scope = "private"

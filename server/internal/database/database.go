@@ -96,6 +96,7 @@ func (db *DB) createTables() error {
 			message_text TEXT NOT NULL,
 			message_type TEXT NOT NULL,
 			reply_to TEXT,
+			delivered BOOLEAN DEFAULT FALSE,
 			sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (from_agent_id) REFERENCES agents(id),
 			FOREIGN KEY (to_agent_id) REFERENCES agents(id),

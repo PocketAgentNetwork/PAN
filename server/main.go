@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"pan-server/internal/config"
 	"pan-server/internal/database"
@@ -46,13 +51,38 @@ func main() {
 	go func() {
 		webAddr := fmt.Sprintf(":%d", cfg.WebPort)
 		log.Printf("Starting web dashboard on %s", webAddr)
-		if err := http.ListenAndServe(webAddr, mux); err != nil {
+		if err := http.ListenAndServe(webAddr, mux); err != nil && err != http.ErrServerClosed {
 			log.Fatal("Web server failed:", err)
 		}
 	}()
 
-	// Start WebSocket server
-	addr := fmt.Sprintf(":%d", cfg.Port)
-	log.Printf("Starting WebSocket server on %s", addr)
-	log.Fatal(http.ListenAndServe(addr, mux))
+	// Start WebSocket server with graceful shutdown
+	wsServer := &http.Server{
+		Addr:    fmt.Sprintf(":%d", cfg.Port),
+		Handler: mux,
+	}
+
+	go func() {
+		log.Printf("Starting WebSocket server on :%d", cfg.Port)
+		if err := wsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal("WebSocket server failed:", err)
+		}
+	}()
+
+	// Wait for interrupt signal
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	color.Yellow("\n📟 PAN Network shutting down gracefully...")
+
+	// Give connections 10 seconds to close
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := wsServer.Shutdown(ctx); err != nil {
+		log.Printf("Server forced to shutdown: %v", err)
+	}
+
+	color.Green("✅ PAN Network stopped cleanly")
 }

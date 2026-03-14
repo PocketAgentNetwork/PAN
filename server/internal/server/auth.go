@@ -159,6 +159,9 @@ func (s *Server) handleAuth(agent *types.Agent, msg *types.Message) error {
 	// Notify other agents
 	s.broadcastSystem(fmt.Sprintf("%s came online", agent.Name), agent.ID)
 
+	// Deliver offline messages
+	go s.deliverOfflineMessages(agent)
+
 	return nil
 }
 
@@ -199,4 +202,35 @@ func (s *Server) validateRoomName(name string) error {
 	}
 	
 	return nil
+}
+
+// deliverOfflineMessages sends any pending DMs to a newly connected agent
+func (s *Server) deliverOfflineMessages(agent *types.Agent) {
+	messages, err := s.db.GetOfflineMessages(agent.ID)
+	if err != nil || len(messages) == 0 {
+		return
+	}
+
+	// Notify agent they have offline messages
+	s.sendMessage(agent, &types.Message{
+		Type:      types.MsgTypeNotification,
+		Message:   fmt.Sprintf("You have %d message(s) while you were offline", len(messages)),
+		Timestamp: time.Now(),
+	})
+
+	// Deliver each message
+	for _, msg := range messages {
+		s.sendMessage(agent, &types.Message{
+			Type:      types.MsgTypeChat,
+			ID:        msg.ID,
+			From:      msg.FromAgentID,
+			FromName:  msg.FromName,
+			Text:      msg.Text,
+			Scope:     "private",
+			Timestamp: msg.SentAt,
+		})
+	}
+
+	// Mark as delivered
+	s.db.MarkMessagesDelivered(agent.ID)
 }

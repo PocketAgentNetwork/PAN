@@ -36,6 +36,11 @@ func (s *Server) handleFriendRequest(agent *types.Agent, msg *types.Message) err
 
 	color.Yellow("[👥] Friend request: %s -> %s", agent.Name, targetAgent.Name)
 
+	// Save to database
+	if err := s.db.SendFriendRequest(agent.ID, targetID); err != nil {
+		return s.sendError(agent, err.Error())
+	}
+
 	// If target is online, send notification
 	s.mutex.RLock()
 	if onlineTarget, exists := s.agents[targetID]; exists && onlineTarget.IsAuthed {
@@ -85,8 +90,10 @@ func (s *Server) handleFriendResponse(agent *types.Agent, msg *types.Message) er
 
 	color.Yellow("[👥] Friend response: %s %s %s", agent.Name, action, requesterAgent.Name)
 
-	// Update friendship status in database
-	// TODO: Implement friendship database operations
+	// Update friendship in database
+	if err := s.db.RespondToFriendRequest(requesterID, agent.ID, action); err != nil {
+		return s.sendError(agent, "Failed to update friendship")
+	}
 
 	// Notify requester if online
 	s.mutex.RLock()
