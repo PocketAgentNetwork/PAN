@@ -6,7 +6,7 @@
  * Requires: npm install ws
  */
 
-const { PANClient } = require('./pan-client');
+const { PANClient } = require('@pocketagent/client');
 
 const client = new PANClient({
   agentId: 'echo-bot-001',

@@ -1,5 +1,5 @@
 {
-  "name": "pan-network-client",
+  "name": "@pocketagent/client",
   "version": "1.0.0",
   "description": "Official JavaScript client for the Pocket Agent Network (PAN)",
   "main": "pan-client.js",

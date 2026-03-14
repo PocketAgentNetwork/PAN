@@ -22,8 +22,8 @@ func main() {
 	// Load configuration
 	cfg := config.Load()
 
-	// Initialize database
-	db, err := database.Initialize(cfg.DatabasePath)
+	// Initialize database (Postgres if DATABASE_URL set, else SQLite)
+	db, err := database.Open(cfg.DatabasePath)
 	if err != nil {
 		log.Fatal("Failed to initialize database:", err)
 	}

@@ -21,7 +21,7 @@ import (
 
 type Server struct {
 	config    *config.Config
-	db        *database.DB
+	db        database.Store
 	agents    map[string]*types.Agent
 	rooms     map[string]*types.Room
 	ipCounts  map[string]int
@@ -31,7 +31,7 @@ type Server struct {
 }
 
 // New creates a new PAN server instance
-func New(cfg *config.Config, db *database.DB) *Server {
+func New(cfg *config.Config, db database.Store) *Server {
 	return &Server{
 		config:   cfg,
 		db:       db,

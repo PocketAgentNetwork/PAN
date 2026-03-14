@@ -4,54 +4,63 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/fatih/color"
+	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
+// DB is the SQLite backend (fallback / local dev). Implements Store.
 type DB struct {
 	conn *sql.DB
 }
 
-// Initialize creates and sets up the database
+// Open returns the right Store based on environment:
+//   - DATABASE_URL=postgres://...  → PostgreSQL (recommended for production)
+//   - unset / PAN_DB_PATH          → SQLite (local dev / small deployments)
+func Open(dbPath string) (Store, error) {
+	if dsn := os.Getenv("DATABASE_URL"); dsn != "" {
+		color.Cyan("🐘 DATABASE_URL detected — using PostgreSQL")
+		return InitPostgres(dsn)
+	}
+	color.Yellow("⚠️  No DATABASE_URL set — falling back to SQLite (%s)", dbPath)
+	color.Yellow("   Set DATABASE_URL=postgres://... for production use")
+	return Initialize(dbPath)
+}
+
+// Initialize creates and sets up the SQLite database
 func Initialize(dbPath string) (*DB, error) {
-	color.Yellow("📊 Initializing database at %s...", dbPath)
-	
-	conn, err := sql.Open("sqlite3", dbPath)
+	color.Yellow("📊 Initializing SQLite at %s...", dbPath)
+
+	// WAL mode: concurrent reads + single writer, much better throughput
+	conn, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL&_busy_timeout=5000")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
+	conn.SetMaxOpenConns(1) // SQLite: single writer
 
-	// Test connection
 	if err := conn.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
 	db := &DB{conn: conn}
-	
-	// Create tables
 	if err := db.createTables(); err != nil {
 		return nil, fmt.Errorf("failed to create tables: %w", err)
 	}
-
-	// Create tokens table
 	if err := db.createTokensTable(); err != nil {
 		return nil, fmt.Errorf("failed to create tokens table: %w", err)
 	}
 
-	color.Green("✅ Database initialized successfully")
+	color.Green("✅ SQLite ready (WAL mode)")
 	return db, nil
 }
 
-// Close closes the database connection
-func (db *DB) Close() error {
-	return db.conn.Close()
-}
+func (db *DB) Close() error { return db.conn.Close() }
 
-// createTables creates all necessary tables
 func (db *DB) createTables() error {
 	queries := []string{
-		// Agents table
 		`CREATE TABLE IF NOT EXISTS agents (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL,
@@ -65,29 +74,20 @@ func (db *DB) createTables() error {
 			last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
 			total_messages INTEGER DEFAULT 0
 		)`,
-
-		// Rooms table
 		`CREATE TABLE IF NOT EXISTS rooms (
 			id TEXT PRIMARY KEY,
 			name TEXT NOT NULL UNIQUE,
 			description TEXT DEFAULT '',
 			creator_id TEXT NOT NULL,
 			is_private BOOLEAN DEFAULT FALSE,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (creator_id) REFERENCES agents(id)
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
-
-		// Room members table
 		`CREATE TABLE IF NOT EXISTS room_members (
 			room_id TEXT NOT NULL,
 			agent_id TEXT NOT NULL,
 			joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (room_id, agent_id),
-			FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
-			FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+			PRIMARY KEY (room_id, agent_id)
 		)`,
-
-		// Messages table
 		`CREATE TABLE IF NOT EXISTS messages (
 			id TEXT PRIMARY KEY,
 			from_agent_id TEXT NOT NULL,
@@ -97,14 +97,8 @@ func (db *DB) createTables() error {
 			message_type TEXT NOT NULL,
 			reply_to TEXT,
 			delivered BOOLEAN DEFAULT FALSE,
-			sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (from_agent_id) REFERENCES agents(id),
-			FOREIGN KEY (to_agent_id) REFERENCES agents(id),
-			FOREIGN KEY (room_id) REFERENCES rooms(id),
-			FOREIGN KEY (reply_to) REFERENCES messages(id)
+			sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
-
-		// Friendships table
 		`CREATE TABLE IF NOT EXISTS friendships (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			requester_id TEXT NOT NULL,
@@ -112,86 +106,49 @@ func (db *DB) createTables() error {
 			status TEXT NOT NULL DEFAULT 'pending',
 			requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			responded_at DATETIME,
-			UNIQUE(requester_id, requested_id),
-			FOREIGN KEY (requester_id) REFERENCES agents(id) ON DELETE CASCADE,
-			FOREIGN KEY (requested_id) REFERENCES agents(id) ON DELETE CASCADE
+			UNIQUE(requester_id, requested_id)
 		)`,
-
-		// Jobs table
-		`CREATE TABLE IF NOT EXISTS jobs (
-			id TEXT PRIMARY KEY,
-			title TEXT NOT NULL,
-			description TEXT NOT NULL,
-			poster_id TEXT NOT NULL,
-			budget TEXT DEFAULT '',
-			skills TEXT DEFAULT '[]',
-			status TEXT DEFAULT 'open',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (poster_id) REFERENCES agents(id)
-		)`,
-
-		// Job applications table
-		`CREATE TABLE IF NOT EXISTS job_applications (
-			id TEXT PRIMARY KEY,
-			job_id TEXT NOT NULL,
-			agent_id TEXT NOT NULL,
-			proposal TEXT NOT NULL,
-			rate TEXT DEFAULT '',
-			status TEXT DEFAULT 'pending',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE(job_id, agent_id),
-			FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
-			FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
-		)`,
-
-		// Indexes for performance
-		`CREATE INDEX IF NOT EXISTS idx_messages_room_id ON messages(room_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_messages_from_agent ON messages(from_agent_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_messages_to_agent ON messages(to_agent_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_messages_sent_at ON messages(sent_at)`,
-		`CREATE INDEX IF NOT EXISTS idx_friendships_requester ON friendships(requester_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_friendships_requested ON friendships(requested_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_jobs_poster ON jobs(poster_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status)`,
+		`CREATE INDEX IF NOT EXISTS idx_messages_room     ON messages(room_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_messages_from     ON messages(from_agent_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_messages_to       ON messages(to_agent_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_messages_sent     ON messages(sent_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_friends_requester ON friendships(requester_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_friends_requested ON friendships(requested_id)`,
 	}
 
-	for _, query := range queries {
-		if _, err := db.conn.Exec(query); err != nil {
-			return fmt.Errorf("failed to execute query: %w", err)
+	for _, q := range queries {
+		if _, err := db.conn.Exec(q); err != nil {
+			return fmt.Errorf("migration failed: %w", err)
 		}
 	}
 
-	// Create default rooms
 	if err := db.createDefaultRooms(); err != nil {
-		log.Printf("Warning: Failed to create default rooms: %v", err)
+		log.Printf("Warning: default rooms: %v", err)
 	}
-
 	return nil
 }
 
-// createDefaultRooms creates the default rooms like #agent-square
 func (db *DB) createDefaultRooms() error {
-	defaultRooms := []struct {
-		id, name, description string
-	}{
-		{"agent-square", "#agent-square", "Main hub where all agents gather"},
-		{"crypto", "#crypto", "Cryptocurrency and DeFi discussion"},
-		{"research", "#research", "Agent research and development"},
+	defaults := []struct{ id, name, desc string }{
+		{"agent-square", "#agent-square", "Main hub — all agents gather here"},
+		{"crypto", "#crypto", "Cryptocurrency and DeFi"},
+		{"research", "#research", "Research and development"},
 		{"gaming", "#gaming", "Game agents and strategy"},
 		{"jobs", "#jobs", "Job postings and marketplace"},
 	}
-
-	for _, room := range defaultRooms {
-		_, err := db.conn.Exec(`
-			INSERT OR IGNORE INTO rooms (id, name, description, creator_id, is_private) 
-			VALUES (?, ?, ?, 'system', FALSE)
-		`, room.id, room.name, room.description)
-		
-		if err != nil {
-			return fmt.Errorf("failed to create room %s: %w", room.name, err)
-		}
+	for _, r := range defaults {
+		db.conn.Exec(`INSERT OR IGNORE INTO rooms (id,name,description,creator_id) VALUES (?,?,?,'system')`,
+			r.id, r.name, r.desc)
 	}
-
-	color.Green("🏠 Created default rooms: #agent-square, #crypto, #research, #gaming, #jobs")
+	color.Green("🏠 Default rooms ready")
 	return nil
+}
+
+// ensure DB implements Store at compile time
+var _ Store = (*DB)(nil)
+var _ Store = (*PostgresStore)(nil)
+
+// isPostgresDSN checks if a string looks like a postgres connection string
+func isPostgresDSN(s string) bool {
+	return strings.HasPrefix(s, "postgres://") || strings.HasPrefix(s, "postgresql://")
 }

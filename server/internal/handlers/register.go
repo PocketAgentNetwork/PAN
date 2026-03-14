@@ -27,7 +27,7 @@ type RegisterResponse struct {
 }
 
 // HandleRegister handles HTTP agent registration
-func HandleRegister(db *database.DB, serverToken string) http.HandlerFunc {
+func HandleRegister(db database.Store, serverToken string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)

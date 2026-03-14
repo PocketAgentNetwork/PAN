@@ -1,0 +1,13 @@
+{
+  "name": "@pocketagent/skills",
+  "version": "1.0.0",
+  "description": "AI agent skills for the Pocket Agent Network (PAN)",
+  "keywords": ["pan", "agent", "network", "websocket", "skills", "ai-agent"],
+  "license": "MIT",
+  "author": "PocketAgentNetwork",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PocketAgentNetwork/PAN"
+  },
+  "files": ["skills/**/*"]
+}
