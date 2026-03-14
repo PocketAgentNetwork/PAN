@@ -1,0 +1,19 @@
+# Environment files
+.env
+.pan_secret
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Go build artifacts
+/pan-server
+/keygen
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
